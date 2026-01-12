@@ -7,7 +7,7 @@
 %%% Created : 29 Mar 2016 by Brujo Benavides <>
 %%%-------------------------------------------------------------------
 -module(erls_config).
--export([get_host/0, get_port/0, get_scheme/0]).
+-export([get_host/0, get_port/0, get_scheme/0, get_username/0, get_password/0]).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -51,4 +51,34 @@ get_scheme() ->
             <<"https">>;
         {ok, Scheme}->
             Scheme
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Retrieves the username for Basic Auth.
+%% If nothing is defined in the app env for the key 'username', it's
+%% undefined (no authentication).
+%% @end
+%%--------------------------------------------------------------------
+get_username() ->
+    case application:get_env(erlastic_search, username) of
+        undefined ->
+            undefined;
+        {ok, Username}->
+            Username
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Retrieves the password for Basic Auth.
+%% If nothing is defined in the app env for the key 'password', it's
+%% undefined (no authentication).
+%% @end
+%%--------------------------------------------------------------------
+get_password() ->
+    case application:get_env(erlastic_search, password) of
+        undefined ->
+            undefined;
+        {ok, Password}->
+            Password
     end.

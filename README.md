@@ -15,7 +15,9 @@ Configure the connection in your application environment:
 {erlastic_search, [
     {host, <<"localhost">>},
     {port, 9200},
-    {scheme, <<"https">>}  %% Default: https (ES 8.x+ has security enabled)
+    {scheme, <<"https">>},       %% Default: https (ES 8.x+ has security enabled)
+    {username, <<"elastic">>},   %% Basic Auth username
+    {password, <<"elastic">>}   %% Basic Auth password
 ]}
 ```
 
@@ -26,8 +28,19 @@ For local development with security disabled:
     {host, <<"localhost">>},
     {port, 9200},
     {scheme, <<"http">>}
+    %% No username/password needed when security is disabled
 ]}
 ```
+
+### Configuration Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `host` | binary | `<<"127.0.0.1">>` | Elasticsearch host |
+| `port` | integer | `9200` | Elasticsearch port |
+| `scheme` | binary | `<<"https">>` | URL scheme (`<<"https">>` or `<<"http">>`) |
+| `username` | binary | `undefined` | Basic Auth username |
+| `password` | binary | `undefined` | Basic Auth password |
 
 Build and Run
 -------------
@@ -136,9 +149,11 @@ Elasticsearch 8.x removed document types. If you're upgrading from an older vers
 - Old tuple format: `{Index, Type, Id, Doc}`
 - New tuple format: `{Index, Id, Doc}`
 
-**HTTPS by Default**
-- ES 8.x+ has security enabled by default, requiring HTTPS
-- Configure `{scheme, <<"http">>}` for local dev with security disabled
+**Security Enabled by Default (ES 8.x+)**
+- HTTPS is required by default
+- Basic Auth with username/password is required
+- Configure credentials: `{username, <<"elastic">>}, {password, <<"your_password">>}`
+- For local dev with security disabled: `{scheme, <<"http">>}` (no credentials needed)
 
 Using another JSON library than `jsx`
 -------------------------------------
