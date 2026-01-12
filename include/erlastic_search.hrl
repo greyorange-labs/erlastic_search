@@ -8,6 +8,9 @@
 -record(erls_params, {
           host        = erls_config:get_host() :: binary(),
           port        = erls_config:get_port() :: integer(),
+          
+          % URL scheme: <<"https">> (default for ES 8.x+) or <<"http">>
+          scheme      = erls_config:get_scheme() :: binary(),
 
           % These are passed verbatim to the underlying http client in use.
           http_client_options = []:: [term()], 
