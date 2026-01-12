@@ -413,13 +413,14 @@ upsert_doc_opts(Params, Index, Type, Id, Doc, Opts) when is_list(Opts), (is_list
 
 %% Bulk index docs with default params
 -spec bulk_index_docs(list()) -> {ok, list} | {error, any()}.
-bulk_index_docs(IndexTypeIdJsonTuples) ->
-    bulk_index_docs(#erls_params{}, IndexTypeIdJsonTuples).
+bulk_index_docs(IndexIdJsonTuples) ->
+    bulk_index_docs(#erls_params{}, IndexIdJsonTuples).
 
-%% Documents is [ {Index, Type, Id, Json}, {Index, Type, Id, HeaderInformation, Json}... ]
+%% Documents is [ {Index, Id, Json}, {Index, Id, HeaderInformation, Json}... ]
+%% Note: Document types were removed in Elasticsearch 8.x
 -spec bulk_index_docs(#erls_params{}, list()) -> {ok, list()} | {error, any()}.
-bulk_index_docs(Params, IndexTypeIdJsonTuples) ->
-    bulk_operation(Params, [{index, IndexTypeIdJsonTuple} || IndexTypeIdJsonTuple <- IndexTypeIdJsonTuples]).
+bulk_index_docs(Params, IndexIdJsonTuples) ->
+    bulk_operation(Params, [{index, IndexIdJsonTuple} || IndexIdJsonTuple <- IndexIdJsonTuples]).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -664,38 +665,38 @@ aliases(Params, Body) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Takes a list of operations of the type {Operation, Index, Type, Id, Json}
+%% Takes a list of operations of the type {Operation, Index, Id, Json}
 %% Performs these operations using _bulk endpoint.
 %% The possible operations are index, create, delete and update.
+%% Note: Document types were removed in Elasticsearch 8.x
 %% (see the doc at https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html)
 %% @end
 %%--------------------------------------------------------------------
 -type index() :: binary().
--type type() :: binary().
 -type id() :: binary() | undefined.
--type metadata_tuple() :: {index(), type(), id()} |
-                          {index(), type(), id(), headers()} |
-                          {index(), type(), id(), erlastic_json()} |
-                          {index(), type(), id(), erlastic_json(), headers()}.
+-type metadata_tuple() :: {index(), id()} |
+                          {index(), id(), headers()} |
+                          {index(), id(), erlastic_json()} |
+                          {index(), id(), erlastic_json(), headers()}.
 -type operation() :: {index | create | delete | update, metadata_tuple()}.
 
 -spec bulk_operation([operation()]) -> {ok, list()} | {error, any()}.
-bulk_operation(OperationIndexTypeIdJsonTuples) ->
-    bulk_operation(#erls_params{}, OperationIndexTypeIdJsonTuples).
+bulk_operation(OperationIndexIdJsonTuples) ->
+    bulk_operation(#erls_params{}, OperationIndexIdJsonTuples).
 
 -spec bulk_operation(#erls_params{}, [operation()]) -> {ok, list()} | {error, any()}.
-bulk_operation(Params, OperationIndexTypeIdJsonTuples) ->
+bulk_operation(Params, OperationIndexIdJsonTuples) ->
     Body = lists:map(fun
-                       Build({delete, {Index, Type, Id}}) ->
-                         Build({delete, {Index, Type, Id, [], no_body}});
-                       Build({delete, {Index, Type, Id, HeaderInformation}}) ->
-                         Build({delete, {Index, Type, Id, HeaderInformation, no_body}});
-                       Build({Operation, {Index, Type, Id, Doc}}) ->
-                         Build({Operation, {Index, Type, Id, [], Doc}});
-                       Build({Operation, {Index, Type, Id, HeaderInformation, Doc}}) ->
-                         Header = build_header(Operation, Index, Type, Id, HeaderInformation),
+                       Build({delete, {Index, Id}}) ->
+                         Build({delete, {Index, Id, [], no_body}});
+                       Build({delete, {Index, Id, HeaderInformation}}) ->
+                         Build({delete, {Index, Id, HeaderInformation, no_body}});
+                       Build({Operation, {Index, Id, Doc}}) ->
+                         Build({Operation, {Index, Id, [], Doc}});
+                       Build({Operation, {Index, Id, HeaderInformation, Doc}}) ->
+                         Header = build_header(Operation, Index, Id, HeaderInformation),
                          Header ++ build_body(Operation, Doc)
-                     end, OperationIndexTypeIdJsonTuples),
+                     end, OperationIndexIdJsonTuples),
 
     erls_resource:post(Params, <<"/_bulk">>, [], [], iolist_to_binary(Body), Params#erls_params.http_client_options).
 
@@ -728,10 +729,9 @@ commas([]) ->
 commas([H | T]) ->
     << H/binary, << <<",", B/binary>> || B <- T >>/binary >>.
 
-build_header(Operation, Index, Type, Id, HeaderInformation) ->
+build_header(Operation, Index, Id, HeaderInformation) ->
     Header1 = [
-      {<<"_index">>, Index},
-      {<<"_type">>, Type}
+      {<<"_index">>, Index}
       | HeaderInformation
     ],
 

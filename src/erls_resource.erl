@@ -49,9 +49,10 @@ request(State, Method, Path, Headers, Params, Body, Options) ->
               end)/binary>>,
     {Headers2, Options1, Body} = make_body(Body, Headers, Options),
     Headers3 = default_header(<<"Content-Type">>, <<"application/json">>, Headers2),
-    do_request(State, Method, Path1, Headers3, Body, Options1).
+    Headers4 = add_auth_header(State, Headers3),
+    do_request(State, Method, Path1, Headers4, Body, Options1).
 
-do_request(#erls_params{host=Host, port=Port, timeout=Timeout, ctimeout=CTimeout},
+do_request(#erls_params{host=Host, port=Port, scheme=Scheme, timeout=Timeout, ctimeout=CTimeout},
            Method, Path, Headers, Body, Options) ->
     % Ugly, but to keep backwards compatibility: add recv_timeout and
     % connect_timeout when *not* present in Options.
@@ -65,9 +66,9 @@ do_request(#erls_params{host=Host, port=Port, timeout=Timeout, ctimeout=CTimeout
         Options,
         [{recv_timeout, Timeout}, {connect_timeout, CTimeout}]
     ),
-    case hackney:request(Method, <<Host/binary, ":", (list_to_binary(integer_to_list(Port)))/binary,
-                                   "/", Path/binary>>, Headers, Body,
-                         NewOptions) of
+    Url = <<Scheme/binary, "://", Host/binary, ":", (list_to_binary(integer_to_list(Port)))/binary,
+            "/", Path/binary>>,
+    case hackney:request(Method, Url, Headers, Body, NewOptions) of
         {ok, Status, _Headers, Client} when Status =:= 200
                                           ; Status =:= 201 ->
             case hackney:body(Client) of
@@ -111,3 +112,14 @@ default_content_length(B, H) ->
 
 make_body(Body, Headers, Options) ->
     {default_content_length(Body, Headers), Options, Body}.
+
+%% @doc Add Basic Auth header if username and password are configured
+add_auth_header(#erls_params{username = undefined}, Headers) ->
+    Headers;
+add_auth_header(#erls_params{password = undefined}, Headers) ->
+    Headers;
+add_auth_header(#erls_params{username = Username, password = Password}, Headers) ->
+    Credentials = <<Username/binary, ":", Password/binary>>,
+    EncodedCredentials = base64:encode(Credentials),
+    AuthHeader = {<<"Authorization">>, <<"Basic ", EncodedCredentials/binary>>},
+    [AuthHeader | Headers].
