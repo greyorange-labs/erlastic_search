@@ -416,11 +416,16 @@ upsert_doc_opts(Params, Index, Type, Id, Doc, Opts) when is_list(Opts), (is_list
 bulk_index_docs(IndexIdJsonTuples) ->
     bulk_index_docs(#erls_params{}, IndexIdJsonTuples).
 
-%% Documents is [ {Index, Id, Json}, {Index, Id, HeaderInformation, Json}... ]
+%% ES 8.x+ mode - Documents is [ {Index, Id, Json}, {Index, Id, HeaderInformation, Json}... ]
 %% Note: Document types were removed in Elasticsearch 8.x
 -spec bulk_index_docs(#erls_params{}, list()) -> {ok, list()} | {error, any()}.
-bulk_index_docs(Params, IndexIdJsonTuples) ->
-    bulk_operation(Params, [{index, IndexIdJsonTuple} || IndexIdJsonTuple <- IndexIdJsonTuples]).
+bulk_index_docs(#erls_params{legacy_mode = false} = Params, IndexIdJsonTuples) ->
+    bulk_operation(Params, [{index, IndexIdJsonTuple} || IndexIdJsonTuple <- IndexIdJsonTuples]);
+
+%% ES 6.x/7.x legacy mode - Documents is [ {Index, Type, Id, Json}, {Index, Type, Id, HeaderInformation, Json}... ]
+%% Type is included in bulk operation headers
+bulk_index_docs(#erls_params{legacy_mode = true} = Params, IndexTypeIdJsonTuples) ->
+    bulk_operation(Params, [{index, IndexTypeIdJsonTuple} || IndexTypeIdJsonTuple <- IndexTypeIdJsonTuples]).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -684,8 +689,10 @@ aliases(Params, Body) ->
 bulk_operation(OperationIndexIdJsonTuples) ->
     bulk_operation(#erls_params{}, OperationIndexIdJsonTuples).
 
+%% ES 8.x+ mode (legacy_mode = false) - current behavior, no Type in tuples
+%% Tuple format: {Index, Id} | {Index, Id, Doc} | {Index, Id, HeaderInfo, Doc}
 -spec bulk_operation(#erls_params{}, [operation()]) -> {ok, list()} | {error, any()}.
-bulk_operation(Params, OperationIndexIdJsonTuples) ->
+bulk_operation(#erls_params{legacy_mode = false} = Params, OperationIndexIdJsonTuples) ->
     Body = lists:map(fun
                        Build({delete, {Index, Id}}) ->
                          Build({delete, {Index, Id, [], no_body}});
@@ -697,6 +704,23 @@ bulk_operation(Params, OperationIndexIdJsonTuples) ->
                          Header = build_header(Operation, Index, Id, HeaderInformation),
                          Header ++ build_body(Operation, Doc)
                      end, OperationIndexIdJsonTuples),
+
+    erls_resource:post(Params, <<"/_bulk">>, [], [], iolist_to_binary(Body), Params#erls_params.http_client_options);
+
+%% ES 6.x/7.x legacy mode (legacy_mode = true) - Type in tuples, _type in headers
+%% Tuple format: {Index, Type, Id} | {Index, Type, Id, Doc} | {Index, Type, Id, HeaderInfo, Doc}
+bulk_operation(#erls_params{legacy_mode = true} = Params, OperationIndexTypeIdJsonTuples) ->
+    Body = lists:map(fun
+                       Build({delete, {Index, Type, Id}}) ->
+                         Build({delete, {Index, Type, Id, [], no_body}});
+                       Build({delete, {Index, Type, Id, HeaderInformation}}) ->
+                         Build({delete, {Index, Type, Id, HeaderInformation, no_body}});
+                       Build({Operation, {Index, Type, Id, Doc}}) ->
+                         Build({Operation, {Index, Type, Id, [], Doc}});
+                       Build({Operation, {Index, Type, Id, HeaderInformation, Doc}}) ->
+                         Header = build_header_with_type(Operation, Index, Type, Id, HeaderInformation),
+                         Header ++ build_body(Operation, Doc)
+                     end, OperationIndexTypeIdJsonTuples),
 
     erls_resource:post(Params, <<"/_bulk">>, [], [], iolist_to_binary(Body), Params#erls_params.http_client_options).
 
@@ -729,9 +753,25 @@ commas([]) ->
 commas([H | T]) ->
     << H/binary, << <<",", B/binary>> || B <- T >>/binary >>.
 
+%% ES 8.x+ - no _type in header
 build_header(Operation, Index, Id, HeaderInformation) ->
     Header1 = [
       {<<"_index">>, Index}
+      | HeaderInformation
+    ],
+
+    Header2 = case Id =:= undefined of
+                true -> Header1;
+                false -> [{<<"_id">>, Id} | Header1]
+              end,
+
+    [erls_json:encode([{erlang:atom_to_binary(Operation, utf8), Header2}])].
+
+%% ES 6.x - includes _type in header
+build_header_with_type(Operation, Index, Type, Id, HeaderInformation) ->
+    Header1 = [
+      {<<"_index">>, Index},
+      {<<"_type">>, Type}
       | HeaderInformation
     ],
 
