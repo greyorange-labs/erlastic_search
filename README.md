@@ -41,6 +41,7 @@ For local development with security disabled:
 | `scheme` | binary | `<<"https">>` | URL scheme (`<<"https">>` or `<<"http">>`) |
 | `username` | binary | `undefined` | Basic Auth username |
 | `password` | binary | `undefined` | Basic Auth password |
+| `legacy_mode` | boolean | `false` | Enable legacy mode for ES 6.x/7.x (includes `_type` in bulk headers) |
 
 Build and Run
 -------------
@@ -198,4 +199,33 @@ of a module, in your path, that defines the two following callbacks:
 -callback decode(binary()) -> erlastic_json().
 ```
 where `erlastic_json()` is a type mapping to your JSON representation of choice.
+
+Legacy Mode (ES 6.x/7.x Backward Compatibility)
+------------------------------------------------
+
+For backward compatibility with Elasticsearch 6.x/7.x, set `legacy_mode` to `true`:
+
+```erlang
+{erlastic_search, [
+    {host, <<"localhost">>},
+    {port, 9200},
+    {scheme, <<"http">>},
+    {legacy_mode, true}  %% Enable legacy mode for ES 6.x/7.x
+]}
+```
+
+When `legacy_mode` is enabled:
+- Bulk operations expect `Type` in tuples: `{Index, Type, Id, Doc}`
+- The `_type` field is included in bulk operation headers
+
+**Bulk indexing with ES 6.x:**
+
+```erlang
+%% Tuple format: {Index, Type, Id, Doc} or {Index, Type, Id, Headers, Doc}
+Items = [
+    {<<"index_name">>, <<"_doc">>, <<"doc1">>, #{<<"key">> => <<"value1">>}},
+    {<<"index_name">>, <<"_doc">>, <<"doc2">>, #{<<"key">> => <<"value2">>}}
+],
+erlastic_search:bulk_index_docs(Items).
+```
 

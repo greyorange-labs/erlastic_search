@@ -7,7 +7,7 @@
 %%% Created : 29 Mar 2016 by Brujo Benavides <>
 %%%-------------------------------------------------------------------
 -module(erls_config).
--export([get_host/0, get_port/0, get_scheme/0, get_username/0, get_password/0]).
+-export([get_host/0, get_port/0, get_scheme/0, get_username/0, get_password/0, get_legacy_mode/0]).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -81,4 +81,19 @@ get_password() ->
             undefined;
         {ok, Password}->
             Password
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Returns true if legacy mode is enabled (ES 6.x/7.x compatibility).
+%% If nothing is defined in the app env for the key 'legacy_mode', it's
+%% false (ES 8.x+ mode where document types were removed).
+%% @end
+%%--------------------------------------------------------------------
+get_legacy_mode() ->
+    case application:get_env(erlastic_search, legacy_mode) of
+        undefined ->
+            false;
+        {ok, Val}->
+            Val
     end.

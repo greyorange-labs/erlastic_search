@@ -16,6 +16,10 @@
           username    = erls_config:get_username() :: binary() | undefined,
           password    = erls_config:get_password() :: binary() | undefined,
 
+          % Legacy mode (ES 6.x/7.x compatibility): when true, _type is included
+          % in bulk headers and Type is expected in tuple parameters
+          legacy_mode = erls_config:get_legacy_mode() :: boolean(),
+
           % These are passed verbatim to the underlying http client in use.
           http_client_options = []:: [term()], 
 
